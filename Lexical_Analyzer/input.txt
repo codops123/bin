@@ -1,0 +1,13 @@
+// Sample program for testing Lexical Analyzer
+int main() {
+    /* Multi-line
+       Comment test */
+    int count = 10;
+    float rate = 2.5;
+    char grade = 'A';
+    if (count >= 10) {
+        count = count + 1;
+        printf("Success");
+    }
+    return 0;
+}

@@ -1,0 +1,14 @@
+// Test file for Flex Lexer
+int main() {
+    float pi = 3.14;
+    int counter = 0;
+    /* Check condition 
+       in a loop */
+    while (counter < 10) {
+        counter++;
+    }
+    if (pi >= 3.0) {
+        return counter;
+    }
+    return 0;
+}

@@ -1,0 +1,9 @@
+# Valid Nested expressions
+{ 10 + [ 5 * ( 2 + 3 ) ] } ;
+[ ( 8 / 2 ) + { 3 ^ 2 } ] ;
+( ( 15 - 5 ) * 2 ) ;
+
+# Invalid / Unbalanced parentheses and structural errors
+( 10 + [ 5 * 2 ) ] ;
+{ 20 + 3 ;
+5 + * 2 ;

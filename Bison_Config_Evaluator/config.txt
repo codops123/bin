@@ -1,0 +1,13 @@
+# Sample Configuration Script
+server_port = 8080;
+max_clients = 50;
+timeout = 30 * 2;
+app_name = "Cloud Gateway";
+
+# Dynamic calculations
+buffer_size = max_clients * 1024;
+total_bandwidth = (buffer_size / 1024) * 8;
+
+print app_name;
+print server_port;
+print total_bandwidth;

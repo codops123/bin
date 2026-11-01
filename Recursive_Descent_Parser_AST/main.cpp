@@ -1,311 +1,244 @@
+/* E  → T E'
+
+E' → + T E' | - T E' | ε
+
+T  → F T'
+
+T' → * F T' | / F T' | ε
+
+F  → ( E ) | id | num */
+
 #include <iostream>
 #include <string>
 #include <vector>
-#include <memory>
-#include <unordered_map>
+#include <map>
 #include <cctype>
-#include <iomanip>
-
 using namespace std;
 
-// -------------------------------------------------------------
-// Token Definitions & Lexer
-// -------------------------------------------------------------
-enum TokenType {
-    TOK_ID,
-    TOK_NUM,
-    TOK_PLUS,
-    TOK_MINUS,
-    TOK_MUL,
-    TOK_DIV,
-    TOK_LPAREN,
-    TOK_RPAREN,
-    TOK_EOF
-};
+struct node {
+    string data;
+    node *left, *right;
 
-struct Token {
-    TokenType type;
-    string lexeme;
-    double val; // for numbers
-};
-
-class Lexer {
-private:
-    string src;
-    size_t pos;
-
-public:
-    Lexer(const string& input) : src(input), pos(0) {}
-
-    Token getNextToken() {
-        while (pos < src.length() && isspace(src[pos])) pos++;
-
-        if (pos >= src.length()) {
-            return {TOK_EOF, "", 0.0};
-        }
-
-        char ch = src[pos];
-
-        if (isalpha(ch) || ch == '_') {
-            string id = "";
-            while (pos < src.length() && (isalnum(src[pos]) || src[pos] == '_')) {
-                id += src[pos++];
-            }
-            return {TOK_ID, id, 0.0};
-        }
-
-        if (isdigit(ch)) {
-            string numStr = "";
-            bool hasDot = false;
-            while (pos < src.length() && (isdigit(src[pos]) || (src[pos] == '.' && !hasDot))) {
-                if (src[pos] == '.') hasDot = true;
-                numStr += src[pos++];
-            }
-            return {TOK_NUM, numStr, stod(numStr)};
-        }
-
-        pos++;
-        switch (ch) {
-            case '+': return {TOK_PLUS, "+", 0.0};
-            case '-': return {TOK_MINUS, "-", 0.0};
-            case '*': return {TOK_MUL, "*", 0.0};
-            case '/': return {TOK_DIV, "/", 0.0};
-            case '(': return {TOK_LPAREN, "(", 0.0};
-            case ')': return {TOK_RPAREN, ")", 0.0};
-            default:
-                cerr << "Lexical error: Unexpected character '" << ch << "'\n";
-                return {TOK_EOF, "", 0.0};
-        }
+    node(string d, node* l = NULL, node* r = NULL) {
+        data = d;
+        left = l;
+        right = r;
     }
 };
 
-// -------------------------------------------------------------
-// Abstract Syntax Tree (AST) Nodes
-// -------------------------------------------------------------
-enum NodeType { NODE_OP, NODE_NUM, NODE_ID };
+vector<string> t;
+map<string, double> val;
 
-struct ASTNode {
-    NodeType nodeType;
-    string value;
-    double numValue;
-    shared_ptr<ASTNode> left;
-    shared_ptr<ASTNode> right;
+int i = 0;
+bool error = false;
 
-    ASTNode(NodeType t, const string& val) 
-        : nodeType(t), value(val), numValue(0.0), left(nullptr), right(nullptr) {}
+//node* s();
+node* e();
+node* eprime(node* left);
+node* t1();
+node* tprime(node* left);
+node* f();
 
-    ASTNode(double numVal) 
-        : nodeType(NODE_NUM), value(to_string(numVal)), numValue(numVal), left(nullptr), right(nullptr) {}
-};
+/*
+node* s() {
+    if (t[i] == "id") {
+        node* left = new node("id");
+        i++;
 
-// -------------------------------------------------------------
-// Recursive-Descent Parser
-// Grammar:
-//   E  -> T E'
-//   E' -> + T E' | - T E' | ε
-//   T  -> F T'
-//   T' -> * F T' | / F T' | ε
-//   F  -> ( E ) | id | num
-// -------------------------------------------------------------
-class RecursiveDescentParser {
-private:
-    Lexer lexer;
-    Token currentToken;
+        if (t[i] == "=") {
+            i++;
 
-    void advance() {
-        currentToken = lexer.getNextToken();
-    }
+            node* right = e();
 
-    void match(TokenType expected) {
-        if (currentToken.type == expected) {
-            advance();
-        } else {
-            cerr << "Syntax Error: Unexpected token '" << currentToken.lexeme << "'\n";
-            exit(1);
+            if (right == NULL) return NULL;
+
+            return new node("=", left, right);
         }
     }
 
-    // F -> ( E ) | id | num
-    shared_ptr<ASTNode> parseF() {
-        if (currentToken.type == TOK_LPAREN) {
-            match(TOK_LPAREN);
-            auto node = parseE();
-            match(TOK_RPAREN);
-            return node;
-        } else if (currentToken.type == TOK_ID) {
-            auto node = make_shared<ASTNode>(NODE_ID, currentToken.lexeme);
-            match(TOK_ID);
-            return node;
-        } else if (currentToken.type == TOK_NUM) {
-            auto node = make_shared<ASTNode>(currentToken.val);
-            node->value = currentToken.lexeme;
-            match(TOK_NUM);
-            return node;
-        } else {
-            cerr << "Syntax Error in Factor (F): Expected '(', id, or num\n";
-            exit(1);
-        }
-    }
+    error = true;
+    return NULL;
+}
+*/
 
-    // T' -> * F T' | / F T' | ε
-    shared_ptr<ASTNode> parseTPrime(shared_ptr<ASTNode> inheritedLeft) {
-        if (currentToken.type == TOK_MUL) {
-            match(TOK_MUL);
-            auto right = parseF();
-            auto opNode = make_shared<ASTNode>(NODE_OP, "*");
-            opNode->left = inheritedLeft;
-            opNode->right = right;
-            return parseTPrime(opNode);
-        } else if (currentToken.type == TOK_DIV) {
-            match(TOK_DIV);
-            auto right = parseF();
-            auto opNode = make_shared<ASTNode>(NODE_OP, "/");
-            opNode->left = inheritedLeft;
-            opNode->right = right;
-            return parseTPrime(opNode);
-        }
-        // ε - epsilon production
-        return inheritedLeft;
-    }
+node* e() {
+    node* left = t1();
 
-    // T -> F T'
-    shared_ptr<ASTNode> parseT() {
-        auto left = parseF();
-        return parseTPrime(left);
-    }
+    if (left == NULL) return NULL;
 
-    // E' -> + T E' | - T E' | ε
-    shared_ptr<ASTNode> parseEPrime(shared_ptr<ASTNode> inheritedLeft) {
-        if (currentToken.type == TOK_PLUS) {
-            match(TOK_PLUS);
-            auto right = parseT();
-            auto opNode = make_shared<ASTNode>(NODE_OP, "+");
-            opNode->left = inheritedLeft;
-            opNode->right = right;
-            return parseEPrime(opNode);
-        } else if (currentToken.type == TOK_MINUS) {
-            match(TOK_MINUS);
-            auto right = parseT();
-            auto opNode = make_shared<ASTNode>(NODE_OP, "-");
-            opNode->left = inheritedLeft;
-            opNode->right = right;
-            return parseEPrime(opNode);
-        }
-        // ε - epsilon production
-        return inheritedLeft;
-    }
-
-    // E -> T E'
-    shared_ptr<ASTNode> parseE() {
-        auto left = parseT();
-        return parseEPrime(left);
-    }
-
-public:
-    RecursiveDescentParser(const string& input) : lexer(input) {
-        advance();
-    }
-
-    shared_ptr<ASTNode> parse() {
-        auto root = parseE();
-        if (currentToken.type != TOK_EOF) {
-            cerr << "Warning: Extra tokens after parsing complete expression.\n";
-        }
-        return root;
-    }
-};
-
-// -------------------------------------------------------------
-// AST Visualizer & Evaluator
-// -------------------------------------------------------------
-void printAST(const shared_ptr<ASTNode>& root, const string& prefix = "", bool isLeft = true) {
-    if (!root) return;
-
-    cout << prefix;
-    cout << (isLeft ? "├── " : "└── ");
-
-    if (root->nodeType == NODE_OP) {
-        cout << "[Op: " << root->value << "]\n";
-    } else if (root->nodeType == NODE_ID) {
-        cout << "(Id: " << root->value << ")\n";
-    } else {
-        cout << "(Num: " << root->value << ")\n";
-    }
-
-    printAST(root->left, prefix + (isLeft ? "│   " : "    "), true);
-    printAST(root->right, prefix + (isLeft ? "│   " : "    "), false);
+    return eprime(left);
 }
 
-double evaluateAST(const shared_ptr<ASTNode>& root, const unordered_map<string, double>& symTab) {
-    if (!root) return 0.0;
+node* eprime(node* left) {
+    if (t[i] == "+") {
+        i++;
+        node* right = t1();
 
-    if (root->nodeType == NODE_NUM) {
-        return root->numValue;
+        if (right == NULL) return NULL;
+
+        node* n = new node("+", left, right);
+        return eprime(n);
     }
 
-    if (root->nodeType == NODE_ID) {
-        if (symTab.find(root->value) != symTab.end()) {
-            return symTab.at(root->value);
-        } else {
-            cerr << "Runtime Error: Identifier '" << root->value << "' not found in symbol table.\n";
-            return 0.0;
-        }
+    if (t[i] == "-") {
+        i++;
+        node* right = t1();
+
+        if (right == NULL) return NULL;
+
+        node* n = new node("-", left, right);
+        return eprime(n);
     }
 
-    // Node is an Operator
-    double leftVal = evaluateAST(root->left, symTab);
-    double rightVal = evaluateAST(root->right, symTab);
-
-    if (root->value == "+") return leftVal + rightVal;
-    if (root->value == "-") return leftVal - rightVal;
-    if (root->value == "*") return leftVal * rightVal;
-    if (root->value == "/") {
-        if (rightVal == 0.0) {
-            cerr << "Runtime Error: Division by zero!\n";
-            return 0.0;
-        }
-        return leftVal / rightVal;
-    }
-
-    return 0.0;
+    return left;
 }
 
-void processExpression(const string& expr, const unordered_map<string, double>& symTab) {
-    cout << "=================================================================\n";
-    cout << " Input Expression: " << expr << "\n";
-    cout << "=================================================================\n";
+node* t1() {
+    node* left = f();
 
-    RecursiveDescentParser parser(expr);
-    shared_ptr<ASTNode> astRoot = parser.parse();
+    if (left == NULL) return NULL;
 
-    cout << "\n[1] Abstract Syntax Tree (AST):\n";
-    printAST(astRoot);
+    return tprime(left);
+}
 
-    cout << "\n[2] Evaluation using Symbol Table:\n";
-    for (const auto& entry : symTab) {
-        cout << "    " << entry.first << " = " << entry.second << "\n";
+node* tprime(node* left) {
+    if (t[i] == "*") {
+        i++;
+        node* right = f();
+
+        if (right == NULL) return NULL;
+
+        node* n = new node("*", left, right);
+        return tprime(n);
     }
 
-    double result = evaluateAST(astRoot, symTab);
-    cout << "\n>>> Evaluated Result = " << result << "\n\n";
+    if (t[i] == "/") {
+        i++;
+        node* right = f();
+
+        if (right == NULL) return NULL;
+
+        node* n = new node("/", left, right);
+        return tprime(n);
+    }
+
+    return left;
+}
+
+node* f() {
+    if (t[i] == "(") {
+        i++;
+
+        node* n = e();
+
+        if (n == NULL || t[i] != ")") {
+            error = true;
+            return NULL;
+        }
+
+        i++;
+        return n;
+    }
+
+    if (t[i] == "id" || t[i] == "num") {
+        node* n = new node(t[i]);
+        i++;
+        return n;
+    }
+
+    error = true;
+    return NULL;
+}
+
+void tokenize(string s) {
+    for (int j = 0; j < s.length(); j++) {
+        if (isspace(s[j])) continue;
+
+        if (isalnum(s[j])) {
+            string word = "";
+
+            while (j < s.length() && isalnum(s[j])) {
+                word += s[j];
+                j++;
+            }
+
+            j--;
+            t.push_back(word);
+        }
+        else {
+            t.push_back(string(1, s[j]));
+        }
+    }
+
+    t.push_back("$");
+}
+
+double evaluate(node* n) {
+    if (n->data == "id")
+        return val["id"];
+
+    if (n->data == "num")
+        return val["num"];
+
+    double a = evaluate(n->left);
+    double b = evaluate(n->right);
+    
+    if (n->data == "+") return a + b;
+    if (n->data == "-") return a - b;
+    if (n->data == "*") return a * b;
+    if (n->data == "/") return a / b;
+
+    /*if (n->data == "=") {
+        val["id"] = b;
+        return b;
+    }*/
+
+    return 0;
+}
+
+void display(node* n, int space = 0) {
+    if (n == NULL) return;
+
+    for (int j = 0; j < space; j++)
+        cout << "   ";
+
+    cout << n->data << endl;
+
+    display(n->left, space + 1);
+    display(n->right, space + 1);
 }
 
 int main() {
-    // Expression 1: id + id * num
-    // Let's set variables: a = 5, b = 4, num = 3 -> Result: 5 + (4 * 3) = 17
-    unordered_map<string, double> symTab1 = {
-        {"a", 5.0},
-        {"b", 4.0}
-    };
-    processExpression("a + b * 3", symTab1);
+    string s;
+    double idvalue, numvalue;
 
-    // Expression 2: (id - num) / id
-    // Let's set variables: x = 20, num = 8, y = 4 -> Result: (20 - 8) / 4 = 12 / 4 = 3
-    unordered_map<string, double> symTab2 = {
-        {"x", 20.0},
-        {"y", 4.0}
-    };
-    processExpression("(x - 8) / y", symTab2);
+    cout << "Enter expression: ";
+    getline(cin, s);
+
+    cout << "Enter id value: ";
+    cin >> idvalue;
+
+    cout << "Enter num value: ";
+    cin >> numvalue;
+
+    val["id"] = idvalue;
+    val["num"] = numvalue;
+
+    tokenize(s);
+
+    node* root = e();
+
+    if (error || root == NULL || t[i] != "$") {
+        cout << "Invalid Expression";
+    }
+    else {
+        cout << "Valid Expression\n";
+
+        cout << "\nAST Tree:\n";
+        display(root);
+
+        cout << "\nResult: " << evaluate(root);
+    }
 
     return 0;
 }

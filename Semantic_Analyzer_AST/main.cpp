@@ -1,224 +1,145 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <memory>
 
+#include <iostream>
+#include <map>
+#include <string>
+#include <cctype>
 using namespace std;
 
-enum DataType { TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_BOOL, TYPE_ERROR };
+map<string, string> table;
+string s;
+int pos = 0;
 
-string typeToString(DataType t) {
-    switch (t) {
-        case TYPE_INT: return "int";
-        case TYPE_FLOAT: return "float";
-        case TYPE_STRING: return "string";
-        case TYPE_BOOL: return "bool";
-        default: return "type_error";
+struct Node {
+    string value;
+    Node *left, *right;
+
+    Node(string v, Node *l = NULL, Node *r = NULL) {
+        value = v;
+        left = l;
+        right = r;
     }
+};
+
+void skip() {
+    while (pos < s.size() && s[pos] == ' ')
+        pos++;
 }
 
-enum NodeKind {
-    NODE_VAR_DECL,
-    NODE_ASSIGN,
-    NODE_BIN_OP,
-    NODE_VAR_REF,
-    NODE_INT_LIT,
-    NODE_FLOAT_LIT,
-    NODE_STR_LIT,
-    NODE_BLOCK
-};
+Node* expression();
 
-struct ASTNode {
-    NodeKind kind;
-    string text;
-    DataType declaredType;
-    vector<shared_ptr<ASTNode>> children;
+Node* factor() {
+    skip();
 
-    ASTNode(NodeKind k, string val = "", DataType dt = TYPE_ERROR)
-        : kind(k), text(val), declaredType(dt) {}
-};
-
-class SemanticAnalyzer {
-private:
-    unordered_map<string, DataType> symbolTable;
-    int errorCount = 0;
-
-    void logError(const string& msg) {
-        cout << "[SEMANTIC ERROR]: " << msg << "\n";
-        errorCount++;
+    if (pos < s.size() && s[pos] == '(') {
+        pos++;
+        Node* t = expression();
+        skip();
+        pos++;
+        return t;
     }
 
-public:
-    DataType analyze(shared_ptr<ASTNode> node) {
-        if (!node) return TYPE_ERROR;
+    string v;
+    while (pos < s.size() &&
+          (isalnum(s[pos]) || s[pos] == '.'))
+        v += s[pos++];
 
-        switch (node->kind) {
-            case NODE_INT_LIT:
-                return TYPE_INT;
+    return new Node(v);
+}
 
-            case NODE_FLOAT_LIT:
-                return TYPE_FLOAT;
+Node* term() {
+    Node* l = factor();
+    skip();
 
-            case NODE_STR_LIT:
-                return TYPE_STRING;
+    while (pos < s.size() && (s[pos] == '*' || s[pos] == '/')) {
+        string op = s.substr(pos++, 1);
+        l = new Node(op, l, factor());
+        skip();
+    }
+    return l;
+}
 
-            case NODE_VAR_DECL: {
-                string varName = node->text;
-                if (symbolTable.count(varName)) {
-                    logError("Variable '" + varName + "' is already declared in this scope.");
-                } else {
-                    symbolTable[varName] = node->declaredType;
-                    cout << "[DECL] Registered '" << varName << "' as " << typeToString(node->declaredType) << "\n";
-                }
+Node* expression() {
+    Node* l = term();
+    skip();
 
-                if (!node->children.empty()) {
-                    DataType initType = analyze(node->children[0]);
-                    if (initType != TYPE_ERROR && initType != node->declaredType) {
-                        logError("Type mismatch initializing '" + varName + "'. Expected " +
-                                 typeToString(node->declaredType) + ", got " + typeToString(initType));
-                    }
-                }
-                return TYPE_ERROR;
-            }
+    while (pos < s.size() && (s[pos] == '+' || s[pos] == '-')) {
+        string op = s.substr(pos++, 1);
+        l = new Node(op, l, term());
+        skip();
+    }
+    return l;
+}
 
-            case NODE_VAR_REF: {
-                string varName = node->text;
-                if (!symbolTable.count(varName)) {
-                    logError("Variable '" + varName + "' used before declaration.");
-                    return TYPE_ERROR;
-                }
-                return symbolTable[varName];
-            }
+string check(Node* root) {
+    if (root->left == NULL && root->right == NULL) {
+        string v = root->value;
 
-            case NODE_ASSIGN: {
-                string varName = node->text;
-                if (!symbolTable.count(varName)) {
-                    logError("Assignment to undeclared variable '" + varName + "'.");
-                    return TYPE_ERROR;
-                }
-                DataType expectedType = symbolTable[varName];
-                DataType rhsType = analyze(node->children[0]);
+        if (isdigit(v[0]))
+            return (v.find('.') != string::npos) ? "float" : "int";
 
-                if (rhsType != TYPE_ERROR && rhsType != expectedType) {
-                    logError("Cannot assign " + typeToString(rhsType) + " to '" + varName +
-                             "' of type " + typeToString(expectedType) + ".");
-                } else if (rhsType != TYPE_ERROR) {
-                    cout << "[OK] Valid assignment to '" << varName << "'.\n";
-                }
-                return expectedType;
-            }
-
-            case NODE_BIN_OP: {
-                DataType leftType = analyze(node->children[0]);
-                DataType rightType = analyze(node->children[1]);
-
-                if (leftType == TYPE_ERROR || rightType == TYPE_ERROR) {
-                    return TYPE_ERROR;
-                }
-
-                string op = node->text;
-                if (op == "+" || op == "-" || op == "*" || op == "/") {
-                    if (leftType == TYPE_STRING && rightType == TYPE_STRING && op == "+") {
-                        return TYPE_STRING; // string concatenation
-                    }
-                    if ((leftType == TYPE_INT || leftType == TYPE_FLOAT) &&
-                        (rightType == TYPE_INT || rightType == TYPE_FLOAT)) {
-                        if (leftType == TYPE_FLOAT || rightType == TYPE_FLOAT) return TYPE_FLOAT;
-                        return TYPE_INT;
-                    }
-                    logError("Operator '" + op + "' cannot be applied to " +
-                             typeToString(leftType) + " and " + typeToString(rightType) + ".");
-                    return TYPE_ERROR;
-                }
-
-                if (op == "==" || op == "!=" || op == "<" || op == ">") {
-                    if (leftType != rightType) {
-                        logError("Comparison between incompatible types: " +
-                                 typeToString(leftType) + " and " + typeToString(rightType) + ".");
-                        return TYPE_ERROR;
-                    }
-                    return TYPE_BOOL;
-                }
-                return TYPE_ERROR;
-            }
-
-            case NODE_BLOCK: {
-                for (auto& child : node->children) {
-                    analyze(child);
-                }
-                return TYPE_ERROR;
-            }
+        if (table.find(v) == table.end()) {
+            cout << "Error: Undeclared Variable " << v << endl;
+            return "error";
         }
-        return TYPE_ERROR;
+        return table[v];
     }
 
-    void printSummary() {
-        cout << "\n----------------------------------------\n";
-        if (errorCount == 0) {
-            cout << "Result: Semantic Analysis Passed (0 errors).\n";
-        } else {
-            cout << "Result: Analysis failed with " << errorCount << " error(s).\n";
-        }
-        cout << "----------------------------------------\n";
+    string l = check(root->left);
+    string r = check(root->right);
+
+    if (l == "error" || r == "error")
+        return "error";
+
+    if ((l != "int" && l != "float") ||
+        (r != "int" && r != "float")) {
+        cout << "Error: Invalid operands for " << root->value << endl;
+        return "error";
     }
-};
+
+    return (l == "float" || r == "float") ? "float" : "int";
+}
 
 int main() {
-    cout << "=== Semantic Analyzer & Type Checker ===\n\n";
+    int n;
+    string name, type, variable;
 
-    // Building sample AST:
-    // int age = 21;
-    // float height = 5.9;
-    // string name = "John";
-    // age = height;           <-- type mismatch error
-    // total = 100;            <-- undeclared variable error
-    // int age = 30;           <-- redeclaration error
-    // age = age + 5;          <-- valid
-    // height = height + name; <-- invalid operation error
+    cout << "Enter number of variables: ";
+    cin >> n;
 
-    auto root = make_shared<ASTNode>(NODE_BLOCK);
+    for (int i = 0; i < n; i++) {
+        cout << "Enter variable name and type: ";
+        cin >> name >> type;
+        table[name] = type;
+    }
 
-    auto d1 = make_shared<ASTNode>(NODE_VAR_DECL, "age", TYPE_INT);
-    d1->children.push_back(make_shared<ASTNode>(NODE_INT_LIT, "21"));
-    root->children.push_back(d1);
+    cout << "\nEnter assignment variable: ";
+    cin >> variable;
 
-    auto d2 = make_shared<ASTNode>(NODE_VAR_DECL, "height", TYPE_FLOAT);
-    d2->children.push_back(make_shared<ASTNode>(NODE_FLOAT_LIT, "5.9"));
-    root->children.push_back(d2);
+    if (table.find(variable) == table.end()) {
+        cout << "Error: Undeclared Variable " << variable;
+        return 0;
+    }
 
-    auto d3 = make_shared<ASTNode>(NODE_VAR_DECL, "name", TYPE_STRING);
-    d3->children.push_back(make_shared<ASTNode>(NODE_STR_LIT, "John"));
-    root->children.push_back(d3);
+    cout << "Enter expression: ";
+    cin.ignore();
+    getline(cin, s);
 
-    auto a1 = make_shared<ASTNode>(NODE_ASSIGN, "age");
-    a1->children.push_back(make_shared<ASTNode>(NODE_VAR_REF, "height"));
-    root->children.push_back(a1);
+    Node* root = expression();
 
-    auto a2 = make_shared<ASTNode>(NODE_ASSIGN, "total");
-    a2->children.push_back(make_shared<ASTNode>(NODE_INT_LIT, "100"));
-    root->children.push_back(a2);
+    cout << "\nType of " << variable << " = " << table[variable] << endl;
 
-    auto d4 = make_shared<ASTNode>(NODE_VAR_DECL, "age", TYPE_INT);
-    root->children.push_back(d4);
+    string result = check(root);
 
-    auto a3 = make_shared<ASTNode>(NODE_ASSIGN, "age");
-    auto bin1 = make_shared<ASTNode>(NODE_BIN_OP, "+");
-    bin1->children.push_back(make_shared<ASTNode>(NODE_VAR_REF, "age"));
-    bin1->children.push_back(make_shared<ASTNode>(NODE_INT_LIT, "5"));
-    a3->children.push_back(bin1);
-    root->children.push_back(a3);
+    if (result == "error")
+        return 0;
 
-    auto a4 = make_shared<ASTNode>(NODE_ASSIGN, "height");
-    auto bin2 = make_shared<ASTNode>(NODE_BIN_OP, "+");
-    bin2->children.push_back(make_shared<ASTNode>(NODE_VAR_REF, "height"));
-    bin2->children.push_back(make_shared<ASTNode>(NODE_VAR_REF, "name"));
-    a4->children.push_back(bin2);
-    root->children.push_back(a4);
+    cout << "Expression type = " << result << endl;
 
-    SemanticAnalyzer analyzer;
-    analyzer.analyze(root);
-    analyzer.printSummary();
+    if (table[variable] == result)
+        cout << "Assignment Valid";
+    else
+        cout << "Type Mismatch";
 
     return 0;
 }
+

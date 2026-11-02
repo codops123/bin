@@ -1,184 +1,127 @@
+
 #include <iostream>
 #include <fstream>
-#include <vector>
 #include <string>
-#include <unordered_set>
 #include <cctype>
-
 using namespace std;
 
-// Buffer size including sentinel (EOF character)
-const int BUFFER_SIZE = 128;
-const char SENTINEL = '\0'; // Sentinel to mark end of buffer
+const int SIZE = 10;
 
-class TwoBufferInputSystem {
-private:
-    char buffer[2][BUFFER_SIZE + 1]; // Buffer pairs with extra slot for sentinel
-    int activeBuffer;                // 0 or 1
-    int forward;                     // Lookahead / scan pointer
-    int lexeme_begin;                // Starting point of current lexeme
-    int lexemeBuffer;                // Buffer index where lexeme started
-    ifstream file;
-    bool isFileEnded;
+ifstream file;
+char buffer1[SIZE], buffer2[SIZE];
 
-    unordered_set<string> keywords = {
-        "int", "float", "char", "if", "else", "while", 
-        "for", "return", "void", "double", "switch", "case"
+int count1 = 0, count2 = 0;
+int pos = 0;
+int current = 1;
+int line = 1;
+
+void loadBuffer(int n) {
+    if (n == 1) {
+        file.read(buffer1, SIZE);
+        count1 = file.gcount();
+    }
+    else {
+        file.read(buffer2, SIZE);
+        count2 = file.gcount();
+    }
+}
+
+char getChar() {
+    if (current == 1 && pos >= count1) {
+        current = 2;
+        pos = 0;
+        loadBuffer(2);
+    }
+    else if (current == 2 && pos >= count2) {
+        current = 1;
+        pos = 0;
+        loadBuffer(1);
+    }
+
+    if (current == 1) {
+        if (pos >= count1)
+            return EOF;
+
+        char ch = buffer1[pos++];
+
+        if (ch == '\n')
+            line++;
+
+        return ch;
+    }
+    else {
+        if (pos >= count2)
+            return EOF;
+
+        char ch = buffer2[pos++];
+
+        if (ch == '\n')
+            line++;
+
+        return ch;
+    }
+}
+
+bool isKeyword(string word) {
+    string keywords[] = {
+        "int", "float", "char",
+        "if", "else", "while", "return"
     };
 
-    void loadBuffer(int bufIndex) {
-        if (isFileEnded) {
-            buffer[bufIndex][0] = SENTINEL;
-            return;
-        }
-
-        file.read(buffer[bufIndex], BUFFER_SIZE);
-        streamsize bytesRead = file.gcount();
-
-        // Place sentinel character at the end of valid data
-        buffer[bufIndex][bytesRead] = SENTINEL;
-
-        if (bytesRead < BUFFER_SIZE) {
-            isFileEnded = true;
-        }
+    for (string keyword : keywords) {
+        if (word == keyword)
+            return true;
     }
 
-    char getNextChar() {
-        char c = buffer[activeBuffer][forward++];
+    return false;
+}
 
-        // Sentinel encountered
-        if (c == SENTINEL) {
-            // Check if end of buffer or actual end of file
-            if (isFileEnded && forward - 1 == file.gcount()) {
-                return EOF;
-            }
+int main() {
+    file.open("input.txt");
 
-            // End of current buffer reached, switch to next buffer
-            activeBuffer = 1 - activeBuffer;
-            loadBuffer(activeBuffer);
-            forward = 0;
-            c = buffer[activeBuffer][forward++];
-            
-            if (c == SENTINEL) {
-                return EOF;
-            }
-        }
-        return c;
+    if (!file) {
+        cout << "File not found!";
+        return 1;
     }
 
-    void retract(int steps = 1) {
-        forward -= steps;
-        if (forward < 0) {
-            activeBuffer = 1 - activeBuffer;
-            forward = BUFFER_SIZE - 1;
-        }
-    }
+    loadBuffer(1);
 
-public:
-    TwoBufferInputSystem(const string& filename) {
-        file.open(filename, ios::in | ios::binary);
-        if (!file.is_open()) {
-            cerr << "Error: Unable to open file " << filename << endl;
-            exit(EXIT_FAILURE);
-        }
+    char ch;
+    string lexeme;
 
-        activeBuffer = 0;
-        forward = 0;
-        lexeme_begin = 0;
-        lexemeBuffer = 0;
-        isFileEnded = false;
+    cout << "Line\tLexeme\t\tToken\n";
+    cout << "--------------------------------\n";
 
-        // Load the first buffer initially
-        loadBuffer(0);
-    }
+    while ((ch = getChar()) != EOF) {
 
-    ~TwoBufferInputSystem() {
-        if (file.is_open()) file.close();
-    }
+        if (isspace(ch))
+            continue;
 
-    void scanLexemes() {
-        cout << "========================================================\n";
-        cout << " Scanning File using Two-Buffer Input System (Sentinels)\n";
-        cout << "========================================================\n";
-        cout << left;
-        cout.width(20); cout << "LEXEME";
-        cout.width(20); cout << "TYPE" << endl;
-        cout << "--------------------------------------------------------\n";
+        int tokenLine = line;
 
-        while (true) {
-            char ch = getNextChar();
-            if (ch == (char)EOF) break;
+        if (isalpha(ch) || ch == '_') {
+            lexeme = ch;
 
-            // Skip Whitespace
-            if (isspace(ch)) {
-                continue;
-            }
+            while (true) {
+                ch = getChar();
 
-            // Identifiers / Keywords recognition
-            if (isalpha(ch) || ch == '_') {
-                string lexeme = "";
+                if (ch == EOF || (!isalnum(ch) && ch != '_'))
+                    break;
+
                 lexeme += ch;
-
-                while (true) {
-                    char nextCh = getNextChar();
-                    if (isalnum(nextCh) || nextCh == '_') {
-                        lexeme += nextCh;
-                    } else {
-                        retract(); // Lookahead pointer retracted
-                        break;
-                    }
-                }
-
-                cout.width(20); cout << lexeme;
-                if (keywords.find(lexeme) != keywords.end()) {
-                    cout.width(20); cout << "KEYWORD" << endl;
-                } else {
-                    cout.width(20); cout << "IDENTIFIER" << endl;
-                }
             }
-            // Number Constants
-            else if (isdigit(ch)) {
-                string numStr = "";
-                numStr += ch;
-                while (true) {
-                    char nextCh = getNextChar();
-                    if (isdigit(nextCh) || nextCh == '.') {
-                        numStr += nextCh;
-                    } else {
-                        retract();
-                        break;
-                    }
-                }
-                cout.width(20); cout << numStr;
-                cout.width(20); cout << "NUMBER_CONSTANT" << endl;
-            }
-            // Operators and Punctuations
-            else {
-                string symbol(1, ch);
-                // Check two-character operators like ==, <=, >=, !=
-                char nextCh = getNextChar();
-                if ((ch == '=' || ch == '<' || ch == '>' || ch == '!') && nextCh == '=') {
-                    symbol += nextCh;
-                } else {
-                    retract();
-                }
 
-                cout.width(20); cout << symbol;
-                cout.width(20); cout << "OPERATOR / SYMBOL" << endl;
-            }
+            if (isKeyword(lexeme))
+                cout << tokenLine << "\t" << lexeme << "\t\tKeyword\n";
+            else
+                cout << tokenLine << "\t" << lexeme << "\t\tIdentifier\n";
+
+            if (ch == EOF)
+                break;
         }
-        cout << "========================================================\n";
-    }
-};
-
-int main(int argc, char* argv[]) {
-    string filename = "input.txt";
-    if (argc > 1) {
-        filename = argv[1];
     }
 
-    TwoBufferInputSystem scanner(filename);
-    scanner.scanLexemes();
-
+    file.close();
     return 0;
 }
+

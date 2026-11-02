@@ -1,13 +1,20 @@
-// Sample program for testing Lexical Analyzer
+#include <stdio.h>
+
+/* This is
+   a multi-line comment */
+
 int main() {
-    /* Multi-line
-       Comment test */
-    int count = 10;
-    float rate = 2.5;
-    char grade = 'A';
-    if (count >= 10) {
-        count = count + 1;
-        printf("Success");
+    int a = 10;
+    float b = 20.5;
+
+    printf("int float data main enter value");
+
+    // Calculate sum
+    a = a + 5;
+
+    if (a >= 15) {
+        printf("Hello World");
     }
+
     return 0;
 }
